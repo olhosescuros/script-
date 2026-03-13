@@ -1,474 +1,300 @@
--- ╔══════════════════════════════════════╗
--- ║      ANIME SCRIPT  •  MOBILE v5      ║
--- ║  Speed • Fly • Noclip • HP • TP     ║
--- ╚══════════════════════════════════════╝
+-- ╔════════════════════════════════════════════════╗
+-- ║        MOBILE AIMBOT HUB • SPEED • ESP         ║
+-- ║ Speed • Infinite Jump • Aimbot • FOV • ESP     ║
+-- ╚════════════════════════════════════════════════╝
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenSvc = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
-local TeleportService = game:GetService("TeleportService")
-
 local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
-local function getChar() return LP.Character end
-local function getRoot() local c=getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
-local function getHum()  local c=getChar(); return c and c:FindFirstChildOfClass("Humanoid") end
+local function char() return LP.Character end
+local function hum() local c=char() return c and c:FindFirstChildOfClass("Humanoid") end
+local function root() local c=char() return c and c:FindFirstChild("HumanoidRootPart") end
 
 -- STATE
-local S = {
-	speed=false, speedVal=40,
-	fly=false, flySpeed=60,
-	noclip=false,
-	infHP=false,
-	infJump=false
+local S={
+	speed=false,
+	speedVal=40,
+	jump=false,
+	jumpVal=100,
+	aimbot=false,
+	fov=120,
+	esp=false
 }
 
--- CONNECTIONS
-local conns={}
-local function dc(k) if conns[k] then conns[k]:Disconnect() conns[k]=nil end end
+-- GUI
+local Gui=Instance.new("ScreenGui",LP.PlayerGui)
+Gui.Name="AimbotHub"
+Gui.ResetOnSpawn=false
 
--- FLY BUTTON STATE
-local _flyUp=false
-local _flyDown=false
+-- PANEL
+local Panel=Instance.new("Frame",Gui)
+Panel.Size=UDim2.new(0,300,0,400)
+Panel.Position=UDim2.new(0.5,-150,0.2,0)
+Panel.BackgroundColor3=Color3.fromRGB(20,25,30)
+Panel.Visible=false
+Instance.new("UICorner",Panel)
 
--- ═════════════════════════════
--- FLY SYSTEM (AlignPosition)
--- ═════════════════════════════
-local flyConn, flyCharConn
-local flyAP, flyAtt
-local flyTarget
+local layout=Instance.new("UIListLayout",Panel)
+layout.Padding=UDim.new(0,6)
 
-local function stopFly()
-	S.fly=false
-	_flyUp=false
-	_flyDown=false
-	
-	if flyConn then flyConn:Disconnect() flyConn=nil end
-	if flyCharConn then flyCharConn:Disconnect() flyCharConn=nil end
-	
-	if flyAP then flyAP:Destroy() flyAP=nil end
-	if flyAtt then flyAtt:Destroy() flyAtt=nil end
-	
-	local h=getHum()
-	if h then h.PlatformStand=false end
+local pad=Instance.new("UIPadding",Panel)
+pad.PaddingLeft=UDim.new(0,10)
+pad.PaddingRight=UDim.new(0,10)
+pad.PaddingTop=UDim.new(0,10)
+
+-- FAB
+local FAB=Instance.new("TextButton",Gui)
+FAB.Size=UDim2.new(0,60,0,60)
+FAB.Position=UDim2.new(0,12,0,12)
+FAB.Text="🎯"
+FAB.TextSize=26
+FAB.BackgroundColor3=Color3.fromRGB(0,150,120)
+FAB.TextColor3=Color3.new(1,1,1)
+Instance.new("UICorner",FAB)
+
+FAB.Activated:Connect(function()
+	Panel.Visible=not Panel.Visible
+end)
+
+-- BUTTON
+local function button(text,func)
+	local b=Instance.new("TextButton")
+	b.Size=UDim2.new(1,0,0,40)
+	b.BackgroundColor3=Color3.fromRGB(40,45,50)
+	b.TextColor3=Color3.new(1,1,1)
+	b.Font=Enum.Font.GothamBold
+	b.TextSize=16
+	b.Text=text
+	b.Parent=Panel
+	Instance.new("UICorner",b)
+	b.Activated:Connect(func)
 end
 
-local function startFly()
-	stopFly()
-	S.fly=true
-	
-	local r=getRoot()
-	local h=getHum()
-	if not r or not h then return end
-	
-	h.PlatformStand=true
-	
-	flyAtt=Instance.new("Attachment",r)
-	flyAP=Instance.new("AlignPosition",r)
-	
-	flyAP.Attachment0=flyAtt
-	flyAP.MaxForce=1e6
-	flyAP.Responsiveness=60
-	flyAP.MaxVelocity=math.huge
-	flyAP.ApplyAtCenterOfMass=true
-	
-	flyTarget=r.Position
-	flyAP.Position=flyTarget
-	
-	flyConn=RunService.RenderStepped:Connect(function(dt)
-		if not S.fly then stopFly() return end
-		
-		local r2=getRoot()
-		if not r2 then stopFly() return end
-		
-		local cam=workspace.CurrentCamera
-		local cf=cam.CFrame
-		
-		local move=Vector3.zero
-		
-		if UIS:IsKeyDown(Enum.KeyCode.W) then move+=cf.LookVector end
-		if UIS:IsKeyDown(Enum.KeyCode.S) then move-=cf.LookVector end
-		if UIS:IsKeyDown(Enum.KeyCode.A) then move-=cf.RightVector end
-		if UIS:IsKeyDown(Enum.KeyCode.D) then move+=cf.RightVector end
-		if UIS:IsKeyDown(Enum.KeyCode.Space) then move+=Vector3.new(0,1,0) end
-		if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then move-=Vector3.new(0,1,0) end
-		
-		if _flyUp then move+=Vector3.new(0,1,0) end
-		if _flyDown then move-=Vector3.new(0,1,0) end
-		
-		if move.Magnitude>0 then move=move.Unit end
-		
-		flyTarget+=move*(S.flySpeed*dt)
-		flyAP.Position=flyTarget
+-- SLIDER
+local function slider(text,min,max,default,callback)
+
+	local frame=Instance.new("Frame")
+	frame.Size=UDim2.new(1,0,0,50)
+	frame.BackgroundTransparency=1
+	frame.Parent=Panel
+
+	local label=Instance.new("TextLabel")
+	label.Size=UDim2.new(1,0,0,20)
+	label.Text=text..": "..default
+	label.TextColor3=Color3.new(1,1,1)
+	label.BackgroundTransparency=1
+	label.Font=Enum.Font.GothamBold
+	label.TextSize=14
+	label.Parent=frame
+
+	local bar=Instance.new("Frame")
+	bar.Size=UDim2.new(1,0,0,10)
+	bar.Position=UDim2.new(0,0,0,30)
+	bar.BackgroundColor3=Color3.fromRGB(60,60,60)
+	bar.Parent=frame
+	Instance.new("UICorner",bar)
+
+	local fill=Instance.new("Frame")
+	fill.Size=UDim2.new((default-min)/(max-min),0,1,0)
+	fill.BackgroundColor3=Color3.fromRGB(0,170,255)
+	fill.Parent=bar
+	Instance.new("UICorner",fill)
+
+	local dragging=false
+
+	bar.InputBegan:Connect(function(i)
+		if i.UserInputType.Name:find("Touch") or i.UserInputType==Enum.UserInputType.MouseButton1 then
+			dragging=true
+		end
 	end)
-	
-	flyCharConn=LP.CharacterAdded:Connect(function()
-		task.wait(0.6)
-		if S.fly then startFly() end
+
+	bar.InputEnded:Connect(function()
+		dragging=false
 	end)
+
+	UIS.InputChanged:Connect(function(i)
+		if dragging and (i.UserInputType.Name:find("Touch") or i.UserInputType==Enum.UserInputType.MouseMovement) then
+
+			local pos=(i.Position.X-bar.AbsolutePosition.X)/bar.AbsoluteSize.X
+			pos=math.clamp(pos,0,1)
+
+			fill.Size=UDim2.new(pos,0,1,0)
+
+			local val=math.floor(min+(max-min)*pos)
+
+			label.Text=text..": "..val
+
+			callback(val)
+
+		end
+	end)
+
 end
 
--- ═════════════════════════════
--- FEATURES
--- ═════════════════════════════
+-- SPEED
+button("⚡ Speed Toggle",function()
+	S.speed=not S.speed
+end)
 
-dc("speed")
-conns.speed=RunService.Heartbeat:Connect(function()
-	local h=getHum()
+slider("Speed",16,120,40,function(v)
+	S.speedVal=v
+end)
+
+RunService.Heartbeat:Connect(function()
+	local h=hum()
 	if not h then return end
-	h.WalkSpeed = S.speed and S.speedVal or 16
+	
+	if S.speed then
+		h.WalkSpeed=S.speedVal
+	else
+		h.WalkSpeed=16
+	end
 end)
 
-dc("hp")
-conns.hp=RunService.Heartbeat:Connect(function()
-	if not S.infHP then return end
-	local h=getHum()
-	if h then h.Health=h.MaxHealth end
+-- JUMP
+button("🦘 Infinite Jump",function()
+	S.jump=not S.jump
 end)
 
-dc("jump")
 UIS.JumpRequest:Connect(function()
-	if not S.infJump then return end
-	local h=getHum()
+	if not S.jump then return end
+	local h=hum()
 	if h then
 		h:ChangeState(Enum.HumanoidStateType.Jumping)
 	end
 end)
 
-dc("noclip")
-conns.noclip=RunService.Stepped:Connect(function()
-	if not S.noclip then return end
-	
-	local c=getChar()
-	if not c then return end
-	
-	for _,p in ipairs(c:GetDescendants()) do
-		if p:IsA("BasePart") then
-			p.CanCollide=false
+-- AIMBOT
+button("🎯 Aimbot",function()
+	S.aimbot=not S.aimbot
+end)
+
+slider("FOV",50,300,120,function(v)
+	S.fov=v
+end)
+
+-- FOV CIRCLE
+local circle=Drawing.new("Circle")
+circle.Thickness=2
+circle.NumSides=50
+circle.Radius=S.fov
+circle.Color=Color3.fromRGB(255,0,0)
+circle.Filled=false
+circle.Visible=true
+
+RunService.RenderStepped:Connect(function()
+
+	local mouse=UIS:GetMouseLocation()
+	circle.Position=mouse
+	circle.Radius=S.fov
+
+	if not S.aimbot then return end
+
+	local closest=nil
+	local dist=S.fov
+
+	for _,plr in pairs(Players:GetPlayers()) do
+
+		if plr~=LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+
+			local pos,onscreen=Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+
+			if onscreen then
+
+				local mag=(Vector2.new(pos.X,pos.Y)-mouse).Magnitude
+
+				if mag<dist then
+					dist=mag
+					closest=plr
+				end
+
+			end
+
 		end
+
 	end
-end)
 
--- ═════════════════════════════
--- GUI
--- ═════════════════════════════
+	if closest and closest.Character then
 
-pcall(function()
-	local old=LP.PlayerGui:FindFirstChild("AnimeScript")
-	if old then old:Destroy() end
-end)
+		local target=closest.Character:FindFirstChild("Head")
 
-local Gui=Instance.new("ScreenGui")
-Gui.Name="AnimeScript"
-Gui.ResetOnSpawn=false
-Gui.IgnoreGuiInset=true
-Gui.Parent=LP.PlayerGui
-
--- ═════════════════════════════
--- TOAST
--- ═════════════════════════════
-
-local ToastHolder=Instance.new("Frame",Gui)
-ToastHolder.Size=UDim2.new(1,0,0,60)
-ToastHolder.Position=UDim2.new(0,0,0,-60)
-ToastHolder.BackgroundTransparency=1
-
-local toastQueue={}
-local toastBusy=false
-
-local function toast(msg,col)
-	table.insert(toastQueue,{msg=msg,col=col or Color3.fromRGB(0,200,140)})
-	
-	if toastBusy then return end
-	toastBusy=true
-	
-	task.spawn(function()
-		while #toastQueue>0 do
-			
-			local data=table.remove(toastQueue,1)
-			
-			local t=Instance.new("Frame")
-			t.Size=UDim2.new(0,260,0,40)
-			t.Position=UDim2.new(0.5,-130,0,0)
-			t.BackgroundColor3=Color3.fromRGB(10,15,20)
-			t.Parent=ToastHolder
-			
-			local corner=Instance.new("UICorner",t)
-			corner.CornerRadius=UDim.new(0,10)
-			
-			local txt=Instance.new("TextLabel",t)
-			txt.Size=UDim2.new(1,0,1,0)
-			txt.BackgroundTransparency=1
-			txt.Text=data.msg
-			txt.TextColor3=data.col
-			txt.Font=Enum.Font.GothamBold
-			txt.TextSize=14
-			
-			TweenSvc:Create(
-				ToastHolder,
-				TweenInfo.new(0.25),
-				{Position=UDim2.new(0,0,0,10)}
-			):Play()
-			
-			task.wait(2)
-			
-			TweenSvc:Create(
-				ToastHolder,
-				TweenInfo.new(0.2),
-				{Position=UDim2.new(0,0,0,-60)}
-			):Play()
-			
-			task.wait(0.25)
-			
-			t:Destroy()
+		if target then
+			Camera.CFrame=CFrame.new(Camera.CFrame.Position,target.Position)
 		end
-		
-		toastBusy=false
-	end)
-end
 
--- ═════════════════════════════
--- FLY BUTTONS
--- ═════════════════════════════
-
-local FlyBtns=Instance.new("Frame",Gui)
-FlyBtns.Size=UDim2.new(0,120,0,60)
-FlyBtns.Position=UDim2.new(0.5,-60,1,-140)
-FlyBtns.BackgroundTransparency=1
-FlyBtns.Visible=false
-
-local FlyUp=Instance.new("TextButton",FlyBtns)
-FlyUp.Size=UDim2.new(0,54,0,54)
-FlyUp.Position=UDim2.new(0,0,0,0)
-FlyUp.Text="▲"
-FlyUp.BackgroundColor3=Color3.fromRGB(0,120,200)
-FlyUp.TextColor3=Color3.new(1,1,1)
-FlyUp.Font=Enum.Font.GothamBold
-FlyUp.TextSize=24
-Instance.new("UICorner",FlyUp)
-
-local FlyDn=Instance.new("TextButton",FlyBtns)
-FlyDn.Size=UDim2.new(0,54,0,54)
-FlyDn.Position=UDim2.new(1,-54,0,0)
-FlyDn.Text="▼"
-FlyDn.BackgroundColor3=Color3.fromRGB(100,0,200)
-FlyDn.TextColor3=Color3.new(1,1,1)
-FlyDn.Font=Enum.Font.GothamBold
-FlyDn.TextSize=24
-Instance.new("UICorner",FlyDn)
-
-FlyUp.InputBegan:Connect(function(i)
-	if i.UserInputType.Name:find("Touch") or i.UserInputType==Enum.UserInputType.MouseButton1 then
-		_flyUp=true
 	end
+
 end)
 
-FlyUp.InputEnded:Connect(function(i)
-	if i.UserInputType.Name:find("Touch") or i.UserInputType==Enum.UserInputType.MouseButton1 then
-		_flyUp=false
+-- ESP
+local espObjects={}
+
+button("👁 ESP Player",function()
+
+	S.esp=not S.esp
+
+	for _,v in pairs(espObjects) do
+		v:Remove()
 	end
-end)
 
-FlyDn.InputBegan:Connect(function(i)
-	if i.UserInputType.Name:find("Touch") or i.UserInputType==Enum.UserInputType.MouseButton1 then
-		_flyDown=true
-	end
-end)
+	espObjects={}
 
-FlyDn.InputEnded:Connect(function(i)
-	if i.UserInputType.Name:find("Touch") or i.UserInputType==Enum.UserInputType.MouseButton1 then
-		_flyDown=false
-	end
-end)
+	if not S.esp then return end
 
--- ═════════════════════════════
--- DRAG SYSTEM (MOBILE SAFE)
--- ═════════════════════════════
+	for _,plr in pairs(Players:GetPlayers()) do
 
-local function makeDrag(frame)
+		if plr~=LP then
 
-	local drag=false
-	local start
-	local startPos
-	
-	frame.InputBegan:Connect(function(input)
-		if input.UserInputType.Name:find("Touch") or input.UserInputType==Enum.UserInputType.MouseButton1 then
-			drag=true
-			start=input.Position
-			startPos=frame.Position
+			local line=Drawing.new("Line")
+			line.Color=Color3.fromRGB(255,0,0)
+			line.Thickness=2
+
+			local box=Drawing.new("Square")
+			box.Color=Color3.fromRGB(0,255,0)
+			box.Thickness=2
+			box.Filled=false
+
+			table.insert(espObjects,line)
+			table.insert(espObjects,box)
+
+			RunService.RenderStepped:Connect(function()
+
+				if not S.esp then
+					line.Visible=false
+					box.Visible=false
+					return
+				end
+
+				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+
+					local pos,onscreen=Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+
+					if onscreen then
+
+						line.Visible=true
+						line.From=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y)
+						line.To=Vector2.new(pos.X,pos.Y)
+
+						box.Visible=true
+						box.Position=Vector2.new(pos.X-20,pos.Y-40)
+						box.Size=Vector2.new(40,80)
+
+					else
+
+						line.Visible=false
+						box.Visible=false
+
+					end
+
+				end
+
+			end)
+
 		end
-	end)
-	
-	UIS.InputChanged:Connect(function(input)
-		if drag and (input.UserInputType.Name:find("Touch") or input.UserInputType==Enum.UserInputType.MouseMovement) then
-			local delta=input.Position-start
-			
-			frame.Position=UDim2.new(
-				startPos.X.Scale,
-				startPos.X.Offset+delta.X,
-				startPos.Y.Scale,
-				startPos.Y.Offset+delta.Y
-			)
-		end
-	end)
-	
-	UIS.InputEnded:Connect(function(input)
-		if input.UserInputType.Name:find("Touch") or input.UserInputType==Enum.UserInputType.MouseButton1 then
-			drag=false
-		end
-	end)
-end
 
--- ═════════════════════════════
--- PANEL
--- ═════════════════════════════
-
-local Panel=Instance.new("Frame",Gui)
-Panel.Size=UDim2.new(0,300,0,420)
-Panel.Position=UDim2.new(0.5,-150,0.15,0)
-Panel.BackgroundColor3=Color3.fromRGB(10,15,20)
-Panel.Visible=false
-Instance.new("UICorner",Panel)
-
-makeDrag(Panel)
-
--- ═════════════════════════════
--- FAB
--- ═════════════════════════════
-
-local FAB=Instance.new("TextButton",Gui)
-FAB.Size=UDim2.new(0,56,0,56)
-FAB.Position=UDim2.new(0,12,0,12)
-FAB.Text="⚔️"
-FAB.BackgroundColor3=Color3.fromRGB(0,150,100)
-FAB.TextColor3=Color3.new(1,1,1)
-FAB.Font=Enum.Font.GothamBold
-FAB.TextSize=24
-Instance.new("UICorner",FAB)
-
-makeDrag(FAB)
-
-local menuOpen=false
-
-local function toggleMenu(v)
-	menuOpen=v~=nil and v or not menuOpen
-	Panel.Visible=menuOpen
-end
-
-FAB.InputBegan:Connect(function(i)
-	if i.UserInputType.Name:find("Touch") or i.UserInputType==Enum.UserInputType.MouseButton1 then
-		toggleMenu()
-	end
-end)
-
--- ═════════════════════════════
--- CONTROLS
--- ═════════════════════════════
-
-toast("⚔️ Script carregado!",Color3.fromRGB(0,200,140))
--- ═════════════════════════════
--- MENU SYSTEM
--- ═════════════════════════════
-
-local Layout = Instance.new("UIListLayout")
-Layout.Padding = UDim.new(0,8)
-Layout.SortOrder = Enum.SortOrder.LayoutOrder
-Layout.Parent = Panel
-
-local padding = Instance.new("UIPadding")
-padding.PaddingLeft = UDim.new(0,10)
-padding.PaddingRight = UDim.new(0,10)
-padding.PaddingTop = UDim.new(0,10)
-padding.Parent = Panel
-
--- CRIAR BOTÃO
-local function createButton(text,callback)
-
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1,0,0,40)
-	btn.BackgroundColor3 = Color3.fromRGB(30,40,50)
-	btn.TextColor3 = Color3.new(1,1,1)
-	btn.Font = Enum.Font.GothamBold
-	btn.TextSize = 16
-	btn.Text = text
-	btn.Parent = Panel
-
-	Instance.new("UICorner",btn)
-
-	btn.Activated:Connect(callback)
-
-end
-
--- SPEED
-createButton("⚡ Speed",function()
-
-	S.speed = not S.speed
-	
-	if S.speed then
-		toast("Speed ativado")
-	else
-		toast("Speed desativado")
 	end
 
 end)
-
--- FLY
-createButton("🕊 Fly",function()
-
-	if S.fly then
-		
-		stopFly()
-		FlyBtns.Visible=false
-		toast("Fly desativado")
-		
-	else
-		
-		startFly()
-		FlyBtns.Visible=true
-		toast("Fly ativado")
-		
-	end
-
-end)
-
--- NOCLIP
-createButton("👻 Noclip",function()
-
-	S.noclip = not S.noclip
-	
-	if S.noclip then
-		toast("Noclip ativado")
-	else
-		toast("Noclip desativado")
-	end
-
-end)
-
--- INFINITE HP
-createButton("❤️ Infinite HP",function()
-
-	S.infHP = not S.infHP
-	
-	if S.infHP then
-		toast("HP infinito ativado")
-	else
-		toast("HP infinito desativado")
-	end
-
-end)
-
--- INFINITE JUMP
-createButton("🦘 Infinite Jump",function()
-
-	S.infJump = not S.infJump
-	
-	if S.infJump then
-		toast("Pulo infinito ativado")
-	else
-		toast("Pulo infinito desativado")
-	end
-
-end)
-
-toast("⚔️ Anime Script V6 carregado!")
