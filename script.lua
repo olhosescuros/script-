@@ -367,3 +367,108 @@ end)
 -- ═════════════════════════════
 
 toast("⚔️ Script carregado!",Color3.fromRGB(0,200,140))
+-- ═════════════════════════════
+-- MENU SYSTEM
+-- ═════════════════════════════
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0,8)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Parent = Panel
+
+local padding = Instance.new("UIPadding")
+padding.PaddingLeft = UDim.new(0,10)
+padding.PaddingRight = UDim.new(0,10)
+padding.PaddingTop = UDim.new(0,10)
+padding.Parent = Panel
+
+-- CRIAR BOTÃO
+local function createButton(text,callback)
+
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1,0,0,40)
+	btn.BackgroundColor3 = Color3.fromRGB(30,40,50)
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 16
+	btn.Text = text
+	btn.Parent = Panel
+
+	Instance.new("UICorner",btn)
+
+	btn.Activated:Connect(callback)
+
+end
+
+-- SPEED
+createButton("⚡ Speed",function()
+
+	S.speed = not S.speed
+	
+	if S.speed then
+		toast("Speed ativado")
+	else
+		toast("Speed desativado")
+	end
+
+end)
+
+-- FLY
+createButton("🕊 Fly",function()
+
+	if S.fly then
+		
+		stopFly()
+		FlyBtns.Visible=false
+		toast("Fly desativado")
+		
+	else
+		
+		startFly()
+		FlyBtns.Visible=true
+		toast("Fly ativado")
+		
+	end
+
+end)
+
+-- NOCLIP
+createButton("👻 Noclip",function()
+
+	S.noclip = not S.noclip
+	
+	if S.noclip then
+		toast("Noclip ativado")
+	else
+		toast("Noclip desativado")
+	end
+
+end)
+
+-- INFINITE HP
+createButton("❤️ Infinite HP",function()
+
+	S.infHP = not S.infHP
+	
+	if S.infHP then
+		toast("HP infinito ativado")
+	else
+		toast("HP infinito desativado")
+	end
+
+end)
+
+-- INFINITE JUMP
+createButton("🦘 Infinite Jump",function()
+
+	S.infJump = not S.infJump
+	
+	if S.infJump then
+		toast("Pulo infinito ativado")
+	else
+		toast("Pulo infinito desativado")
+	end
+
+end)
+
+toast("⚔️ Anime Script V6 carregado!")
